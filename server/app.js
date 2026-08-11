@@ -2,6 +2,8 @@ import express from "express";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
@@ -20,6 +22,14 @@ const io = new Server(server,{
 io.on("connection", (socket) => {
     console.log("A user connected");
     console.log(socket.id);
+    socket.emit("welcome", `Welcome to the chat ${socket.id}`);
+    socket.on("message", (message) => {
+        console.log("Message from client", message);
+        io.emit("message", message);
+    });
+    socket.on("disconnect", () => {
+        console.log("A user disconnected");
+    });
 });
 
 app.use(
