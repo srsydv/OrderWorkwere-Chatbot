@@ -3,12 +3,24 @@ import { Server } from "socket.io";
 import { createServer } from "http";
 import cors from "cors";
 import dotenv from "dotenv";
+import connectDB from "./config/db.js";
+import userRoutes from "./routes/userRoutes.js";
+
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
+connectDB();
+
+
+
+
 const app = express();
 const server = createServer(app);
+
+app.use(express.json());
+app.use("/api/status",(req, res)=> res.send("server is running"));
+app.use("/api/users", userRoutes);
 
 const io = new Server(server,{
     cors: {
