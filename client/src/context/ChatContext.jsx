@@ -6,11 +6,21 @@ const ChatContext = createContext(null);
 
 export const ChatProvider = ({ children }) => {
   const { socket, authUser } = useAuth();
+
   const [users, setUsers] = useState([]);
   const [unseenMessages, setUnseenMessages] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+
+  const addUserToSidebar = (user) => {
+    if (!user?._id) return;
+    const userId = String(user._id);
+    setUsers((prev) => {
+      const others = prev.filter((u) => String(u._id) !== userId);
+      return [user, ...others];
+    });
+  };
 
   const getUsers = async () => {
     try {
@@ -32,6 +42,7 @@ export const ChatProvider = ({ children }) => {
       setUnseenMessages((prev) => {
         const next = { ...prev };
         delete next[userId];
+        delete next[String(userId)];
         return next;
       });
     } catch (error) {
@@ -46,7 +57,13 @@ export const ChatProvider = ({ children }) => {
       body: JSON.stringify({ text, image }),
     });
     setMessages((prev) => [...prev, data.message]);
+    addUserToSidebar(selectedUser);
     return data.message;
+  };
+
+  const selectUser = (user) => {
+    setSelectedUser(user);
+    addUserToSidebar(user);
   };
 
   const markAsSeen = async (messageId) => {
@@ -97,8 +114,17 @@ export const ChatProvider = ({ children }) => {
       }
     };
 
+    const handleSidebarUpdate = ({ user }) => {
+      addUserToSidebar(user);
+    };
+
     socket.on("newMessage", handleNewMessage);
-    return () => socket.off("newMessage", handleNewMessage);
+    socket.on("sidebarUpdate", handleSidebarUpdate);
+
+    return () => {
+      socket.off("newMessage", handleNewMessage);
+      socket.off("sidebarUpdate", handleSidebarUpdate);
+    };
   }, [socket, selectedUser, authUser]);
 
   const value = {
@@ -106,7 +132,7 @@ export const ChatProvider = ({ children }) => {
     usersLoading,
     unseenMessages,
     selectedUser,
-    setSelectedUser,
+    setSelectedUser: selectUser,
     messages,
     getUsers,
     getMessages,

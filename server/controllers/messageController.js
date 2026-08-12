@@ -4,23 +4,46 @@ import { io, userSocketMap } from "../config/socket.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
-    const filteredUsers = await User.find({
-      _id: { $ne: req.user._id },
-    }).select("-password");
+    const myId = req.user._id;
 
+    // SIDEBAR USERS = only people I have already chatted with
+    // 1) All messages where I participated
+    const messages = await Message.find({
+      $or: [{ sender: myId }, { receiver: myId }],
+    }).select("sender receiver");
+
+    // 2) Unique partner ids (everyone I talked to, excluding myself)
+    const partnerIds = [
+      ...new Set(
+        messages.map((msg) => {
+          const senderId = String(msg.sender);
+          const receiverId = String(msg.receiver);
+          return senderId === String(myId) ? receiverId : senderId;
+        })
+      ),
+    ];
+
+    // 3) Load partner profiles (empty array if I have no chats yet)
+    const users = await User.find({ _id: { $in: partnerIds } }).select(
+      "-password"
+    );
+
+    // 4) Unseen counts: messages FROM that partner TO me that are unseen
     const unseenMessages = {};
-    const promises = filteredUsers.map(async (user) => {
-      const messages = await Message.find({
-        sender: user._id,
-        receiver: req.user._id,
-        seen: false,
-      });
-      if (messages.length > 0) {
-        unseenMessages[user._id] = messages.length;
-      }
-    });
-    await Promise.all(promises);
-    res.status(200).json({ success: true, users: filteredUsers, unseenMessages });
+    await Promise.all(
+      users.map(async (user) => {
+        const count = await Message.countDocuments({
+          sender: user._id,
+          receiver: myId,
+          seen: false,
+        });
+        if (count > 0) {
+          unseenMessages[user._id] = count;
+        }
+      })
+    );
+
+    res.status(200).json({ success: true, users, unseenMessages });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -74,9 +97,18 @@ export const sendMessage = async (req, res) => {
 
     const message = await Message.create({ text, image, sender, receiver });
 
+    // SOCKET EMITS TO RECEIVER
     const receiverSocket = userSocketMap[String(receiver)];
     if (receiverSocket) {
+      // Chat window: append this message if B has that chat open
       io.to(receiverSocket).emit("newMessage", message);
+
+      // Sidebar: add/move A to the top of B's contact list live
+      const senderUser = await User.findById(sender).select("-password");
+      io.to(receiverSocket).emit("sidebarUpdate", {
+        user: senderUser,
+        message,
+      });
     }
 
     res.status(200).json({ success: true, message });

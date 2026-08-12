@@ -1,6 +1,7 @@
 import User from "../models/user.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../config/utils.js";
+import { io } from "../config/socket.js";
 
 export const signup = async (req, res) => {
     const { fullname, email, password, bio } = req.body;
@@ -23,6 +24,13 @@ export const signup = async (req, res) => {
         const token = generateToken(newUser._id);
         const userResponse = newUser.toObject();
         delete userResponse.password;
+
+        // Tell every online client a new account exists so search can find them
+        // without refreshing the page
+        if (io) {
+            io.emit("newUser", userResponse);
+        }
+
         res.status(201).json({ success: true, user: userResponse, Token: token });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -72,6 +80,45 @@ export const getUser = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select("-password");
         res.status(200).json({ success: true, user });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// All users except me — used only to START a new chat (not the sidebar list)
+export const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({ _id: { $ne: req.user._id } }).select(
+            "-password"
+        );
+        res.status(200).json({ success: true, users });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Search users in DB by name or email (excludes me)
+export const searchUsers = async (req, res) => {
+    try {
+        const raw = (req.query.query || "").trim();
+        if (!raw) {
+            return res.status(200).json({ success: true, users: [] });
+        }
+
+        // Escape regex special chars so input like "." or "(" doesn't break the query
+        const query = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+        const users = await User.find({
+            _id: { $ne: req.user._id },
+            $or: [
+                { fullname: { $regex: query, $options: "i" } },
+                { email: { $regex: query, $options: "i" } },
+            ],
+        })
+            .select("-password")
+            .limit(20);
+
+        res.status(200).json({ success: true, users });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

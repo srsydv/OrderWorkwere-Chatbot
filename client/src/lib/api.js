@@ -14,6 +14,13 @@ export const api = async (endpoint, options = {}) => {
     headers,
   });
 
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      "API did not return JSON. Is the backend running on port 3000?"
+    );
+  }
+
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
