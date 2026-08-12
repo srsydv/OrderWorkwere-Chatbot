@@ -1,5 +1,5 @@
 import express from "express";
-import { getUsersForSidebar, getMessages, markMessageAsSeen, sendMessage } from "../controllers/messageController";
+import { getUsersForSidebar, getMessages, markMessageAsSeen, sendMessage } from "../controllers/messageController.js";
 
 const router = express.Router();
 

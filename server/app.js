@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+// import { setIO, userSocketMap } from "./config/socket.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
@@ -33,7 +34,7 @@ const io = new Server(server,{
     }
 });
 
-export const userSocketMap = {};
+// setIO(io);
 
 
 io.on("connection", (socket) => {

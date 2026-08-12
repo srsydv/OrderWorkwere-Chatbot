@@ -1,7 +1,7 @@
 import Message from "../models/message.js";
 import User from "../models/user.js";
 import { generateToken, verifyToken } from "../config/utils.js";
-import { io, userSocketMap } from "../app.js";
+// import { io, userSocketMap } from "../config/socket.js";
 import { protectRoute } from "../middleware/auth.js";
 
 export const getUsersForSidebar = async (req, res) => {
