@@ -1,10 +1,9 @@
 import User from "../models/user.js";
 import bcrypt from "bcrypt";
-import { generateToken, verifyToken } from "../config/utils.js";
-
+import { generateToken } from "../config/utils.js";
 
 export const signup = async (req, res) => {
-    const { fullname, email, password } = req.body;
+    const { fullname, email, password, bio } = req.body;
     try {
         if (!fullname || !email || !password) {
             return res.status(400).json({ message: "All fields are required" });
@@ -15,13 +14,19 @@ export const signup = async (req, res) => {
         }
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = await User.create({ fullname, email, password: hashedPassword });
+        const newUser = await User.create({
+            fullname,
+            email,
+            password: hashedPassword,
+            bio: bio || "Hi Everyone, I am Using QuickChat",
+        });
         const token = generateToken(newUser._id);
-        res.status(201).json({ user: newUser, Token:token });
+        const userResponse = newUser.toObject();
+        delete userResponse.password;
+        res.status(201).json({ success: true, user: userResponse, Token: token });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-    
 };
 
 export const login = async (req, res) => {
@@ -31,27 +36,33 @@ export const login = async (req, res) => {
             return res.status(400).json({ message: "All fields are required" });
         }
         const userData = await User.findOne({ email });
+        if (!userData) {
+            return res.status(400).json({ message: "Invalid email or password" });
+        }
         const isPasswordCorrect = await bcrypt.compare(password, userData.password);
         if (!isPasswordCorrect) {
-            return res.status(400).json({ message: "Invalid password" });
+            return res.status(400).json({ message: "Invalid email or password" });
         }
         const token = generateToken(userData._id);
-        res.status(200).json({ user: userData, Token:token });
+        const userResponse = userData.toObject();
+        delete userResponse.password;
+        res.status(200).json({ success: true, user: userResponse, Token: token });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-
-export const updateProfile = async (req, res, next) => {
+export const updateProfile = async (req, res) => {
     try {
         const { fullname, profilePic, bio } = req.body;
-        if(!profilePic) {
-            updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, bio }, { new: true });
-        } else {
-            updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, profilePic, bio }, { new: true });
+        const updateData = { fullname, bio };
+        if (profilePic) {
+            updateData.profilePic = profilePic;
         }
-        res.status(200).json({ user: updatedUser });
+        const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, {
+            new: true,
+        }).select("-password");
+        res.status(200).json({ success: true, user: updatedUser });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -60,7 +71,7 @@ export const updateProfile = async (req, res, next) => {
 export const getUser = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select("-password");
-        res.status(200).json({ user });
+        res.status(200).json({ success: true, user });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

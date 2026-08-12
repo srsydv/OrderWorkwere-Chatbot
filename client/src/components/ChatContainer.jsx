@@ -1,49 +1,96 @@
-import React, { useState } from 'react'
-import assets, {
-  messagesDummyData,
-  CURRENT_USER_ID,
-  userDummyData,
-} from '../assets/assets.js'
+import React, { useEffect, useRef, useState } from "react";
+import assets from "../assets/assets.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useChat } from "../context/ChatContext.jsx";
 
 const formatTime = (dateStr) => {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-}
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
 
-const getUserById = (id) => userDummyData.find((u) => u._id === id)
+const ChatContainer = () => {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef(null);
+  const imageRef = useRef(null);
 
-const ChatContainer = ({ selectedUser }) => {
-  const [message, setMessage] = useState('')
+  const { authUser, onlineUsers } = useAuth();
+  const { selectedUser, setSelectedUser, messages, sendMessage } = useChat();
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   if (!selectedUser) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <img src={assets.logo_big} alt="QuickChat" className="w-24 h-24 opacity-90" />
-        <p className="text-white text-lg font-light tracking-wide">Chat anytime, anywhere</p>
+        <p className="text-white text-lg font-light tracking-wide">
+          Chat anytime, anywhere
+        </p>
       </div>
-    )
+    );
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!message.trim()) return
-    setMessage('')
-  }
+  const isOnline = onlineUsers.includes(String(selectedUser._id));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!message.trim() || sending) return;
+    setSending(true);
+    try {
+      await sendMessage({ text: message.trim() });
+      setMessage("");
+    } catch (err) {
+      console.error(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      setSending(true);
+      try {
+        await sendMessage({ image: reader.result });
+      } catch (err) {
+        console.error(err.message);
+      } finally {
+        setSending(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full min-w-0">
-      {/* Chat header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10">
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSelectedUser(null)}
+            className="md:hidden opacity-70 hover:opacity-100"
+          >
+            <img src={assets.arrow_icon} alt="Back" className="w-5 h-5 rotate-180" />
+          </button>
           <img
-            src={selectedUser.profilePic}
-            alt={selectedUser.fullName}
+            src={selectedUser.profilePic || assets.avatar_icon}
+            alt={selectedUser.fullname}
             className="w-10 h-10 rounded-full object-cover"
           />
           <div>
-            <p className="text-white font-medium">{selectedUser.fullName}</p>
-            <p className={`text-xs ${selectedUser.isOnline ? 'text-green-400' : 'text-gray-400'}`}>
-              {selectedUser.isOnline ? 'Online' : 'Offline'}
+            <p className="text-white font-medium">{selectedUser.fullname}</p>
+            <p className={`text-xs ${isOnline ? "text-green-400" : "text-gray-400"}`}>
+              {isOnline ? "Online" : "Offline"}
             </p>
           </div>
         </div>
@@ -54,29 +101,33 @@ const ChatContainer = ({ selectedUser }) => {
         />
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {messagesDummyData.map((msg) => {
-          const isSent = msg.senderId === CURRENT_USER_ID
-          const sender = getUserById(msg.senderId) || selectedUser
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+        {messages.map((msg) => {
+          const isSent =
+            String(msg.sender?._id || msg.sender) === String(authUser?._id);
+          const avatar = isSent
+            ? authUser?.profilePic || assets.avatar_icon
+            : selectedUser.profilePic || assets.avatar_icon;
 
           return (
             <div
               key={msg._id}
-              className={`flex items-end gap-2 ${isSent ? 'flex-row-reverse' : 'flex-row'}`}
+              className={`flex items-end gap-2 ${isSent ? "flex-row-reverse" : "flex-row"}`}
             >
               <img
-                src={sender.profilePic}
-                alt={sender.fullName}
+                src={avatar}
+                alt=""
                 className="w-8 h-8 rounded-full object-cover shrink-0"
               />
-              <div className={`max-w-[70%] ${isSent ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+              <div
+                className={`max-w-[70%] ${isSent ? "items-end" : "items-start"} flex flex-col gap-1`}
+              >
                 {msg.text && (
                   <div
                     className={`px-4 py-2.5 rounded-2xl text-sm text-gray-200 leading-relaxed ${
                       isSent
-                        ? 'bg-[#3D4F7C]/80 rounded-br-sm'
-                        : 'bg-[#28334D]/90 rounded-bl-sm'
+                        ? "bg-[#3D4F7C]/80 rounded-br-sm"
+                        : "bg-[#28334D]/90 rounded-bl-sm"
                     }`}
                   >
                     {msg.text}
@@ -94,12 +145,12 @@ const ChatContainer = ({ selectedUser }) => {
                 </span>
               </div>
             </div>
-          )
+          );
         })}
+        <div ref={bottomRef} />
       </div>
 
-      {/* Message input */}
-      <form onSubmit={handleSubmit} className="px-6 py-4 border-t border-white/10">
+      <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 border-t border-white/10">
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">
             <input
@@ -107,21 +158,39 @@ const ChatContainer = ({ selectedUser }) => {
               placeholder="Send a message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              disabled={sending}
               className="w-full bg-[#28334D]/80 text-white text-sm placeholder:text-gray-400 rounded-full py-3 pl-5 pr-12 outline-none border border-white/5 focus:border-purple-500/40"
             />
-            <img
-              src={assets.gallery_icon}
-              alt="Attach"
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 cursor-pointer opacity-50 hover:opacity-80"
+            <button
+              type="button"
+              onClick={() => imageRef.current?.click()}
+              className="absolute right-4 top-1/2 -translate-y-1/2"
+            >
+              <img
+                src={assets.gallery_icon}
+                alt="Attach"
+                className="w-5 h-5 cursor-pointer opacity-50 hover:opacity-80"
+              />
+            </button>
+            <input
+              ref={imageRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageSelect}
             />
           </div>
-          <button type="submit" className="shrink-0">
-            <img src={assets.send_button} alt="Send" className="w-10 h-10 cursor-pointer hover:opacity-80" />
+          <button type="submit" disabled={sending} className="shrink-0">
+            <img
+              src={assets.send_button}
+              alt="Send"
+              className="w-10 h-10 cursor-pointer hover:opacity-80"
+            />
           </button>
         </div>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default ChatContainer
+export default ChatContainer;
