@@ -36,16 +36,16 @@ export const checkAuth = async (req, res, next) => {
     }
 };
 
-export const updateProfile = async (req, res, next) => {
-    try {
-        const { fullname, profilePic, bio } = req.body;
-        if(!profilePic) {
-            updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, bio }, { new: true });
-        } else {
-            updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, profilePic, bio }, { new: true });
-        }
-        res.status(200).json({ user: updatedUser });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+// export const updateProfile = async (req, res, next) => {
+//     try {
+//         const { fullname, profilePic, bio } = req.body;
+//         if(!profilePic) {
+//             updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, bio }, { new: true });
+//         } else {
+//             updatedUser = await User.findByIdAndUpdate(req.user._id, { fullname, profilePic, bio }, { new: true });
+//         }
+//         res.status(200).json({ user: updatedUser });
+//     } catch (error) {
+//         res.status(500).json({ message: error.message });
+//     }
+// };

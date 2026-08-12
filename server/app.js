@@ -5,7 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
-
+import messageRoutes from "./routes/messageRoutes.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
@@ -21,33 +21,37 @@ const server = createServer(app);
 app.use(express.json());
 app.use("/api/status",(req, res)=> res.send("server is running"));
 app.use("/api/users", userRoutes);
+app.use("/api/messages", messageRoutes);
+
+
 
 const io = new Server(server,{
     cors: {
         origin:"*",
-        methods: ["GET", "POST"],
+        methods: ["GET", "POST", "PUT", "DELETE"],
         credentials: true,
     }
 });
 
+export const userSocketMap = {};
+
 
 io.on("connection", (socket) => {
-    console.log("A user connected");
-    console.log(socket.id);
-    socket.emit("welcome", `Welcome to the chat ${socket.id}`);
-    socket.on("message", (message) => {
-        console.log("Message from client", message);
-        io.emit("message", message);
-    });
+    const userId = socket.handshake.query.userId;
+    userSocketMap[userId] = socket.id;
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
     socket.on("disconnect", () => {
-        console.log("A user disconnected");
+        console.log("A user disconnected", userId);
+        delete userSocketMap[userId];
+        io.emit("getOnlineUsers", Object.keys(userSocketMap));
     });
+
 });
 
 app.use(
     cors({
     origin:"*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
 })
 );
