@@ -1,13 +1,18 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import * as schema from "../models/index.js";
 
 const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // RDS requires SSL; rejectUnauthorized:false is fine for staging/learning
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-export const db = drizzle(pool);
+export const db = drizzle(pool, { schema });
 
 const connectDB = async (retries = 5, delayMs = 3000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {

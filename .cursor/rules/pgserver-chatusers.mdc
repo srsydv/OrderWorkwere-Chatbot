@@ -1,0 +1,12 @@
+---
+description: pgServer uses chatUsers (chat_users table), not users
+alwaysApply: true
+---
+
+# pgServer naming
+
+- User table model is `chatUsers` (Postgres table name: `chat_users`).
+- Never use a Drizzle table named `users` in `pgServer`.
+- Import from `models/user.js` as `chatUsers` (or from `models/index.js`).
+- Message `sender` / `receiver` FKs reference `chatUsers.id`.
+- Keep API endpoints the same as the Mongo `server` folder; only the DB table/model name differs.
