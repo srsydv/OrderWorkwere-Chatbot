@@ -1,9 +1,19 @@
-import { eq } from "drizzle-orm";
+import { eq, ne, or, and, ilike } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { db } from "../config/db.js";
 import { chatUsers } from "../models/user.js";
 import { generateToken } from "../config/utils.js";
 import { io } from "../config/socket.js";
+
+const publicUserColumns = {
+  id: chatUsers.id,
+  email: chatUsers.email,
+  fullname: chatUsers.fullname,
+  profilePic: chatUsers.profilePic,
+  bio: chatUsers.bio,
+  createdAt: chatUsers.createdAt,
+  updatedAt: chatUsers.updatedAt,
+};
 
 export const signup = async (req, res) => {
   const { fullname, email, password, bio } = req.body;
@@ -132,6 +142,53 @@ export const getUser = async (req, res) => {
 
     const userResponse = { ...user, _id: user.id };
     res.status(200).json({ success: true, user: userResponse });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// All users except me — used only to START a new chat (not the sidebar list)
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await db
+      .select(publicUserColumns)
+      .from(chatUsers)
+      .where(ne(chatUsers.id, req.user._id));
+
+    const usersResponse = users.map((user) => ({ ...user, _id: user.id }));
+    res.status(200).json({ success: true, users: usersResponse });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Search users in DB by name or email (excludes me)
+export const searchUsers = async (req, res) => {
+  try {
+    const raw = (req.query.query || "").trim();
+    if (!raw) {
+      return res.status(200).json({ success: true, users: [] });
+    }
+
+    // Escape LIKE wildcards so % and _ are treated as normal characters
+    const query = raw.replace(/[%_\\]/g, "\\$&");
+
+    const users = await db
+      .select(publicUserColumns)
+      .from(chatUsers)
+      .where(
+        and(
+          ne(chatUsers.id, req.user._id),
+          or(
+            ilike(chatUsers.fullname, `%${query}%`),
+            ilike(chatUsers.email, `%${query}%`)
+          )
+        )
+      )
+      .limit(20);
+
+    const usersResponse = users.map((user) => ({ ...user, _id: user.id }));
+    res.status(200).json({ success: true, users: usersResponse });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
