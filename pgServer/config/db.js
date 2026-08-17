@@ -1,15 +1,19 @@
+import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "../models/index.js";
 
 const { Pool } = pg;
 
+const connectionString = process.env.DATABASE_URL || "";
+const needsSsl =
+  connectionString.includes("rds.amazonaws.com") ||
+  connectionString.includes("sslmode=");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS requires SSL; rejectUnauthorized:false is fine for staging/learning
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  connectionString,
+  // RDS needs SSL; local Postgres usually does not
+  ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
 export const db = drizzle(pool, { schema });

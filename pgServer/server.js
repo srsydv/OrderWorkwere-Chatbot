@@ -1,14 +1,12 @@
+import "dotenv/config";
 import express from "express";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import cors from "cors";
-import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import { setIO, userSocketMap } from "./config/socket.js";
-
-dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
