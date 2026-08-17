@@ -50,3 +50,89 @@ export const signup = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const [userData] = await db
+      .select()
+      .from(chatUsers)
+      .where(eq(chatUsers.email, email));
+
+    if (!userData) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, userData.password);
+    if (!isPasswordCorrect) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const token = generateToken(userData.id);
+    const { password: _, ...userWithoutPassword } = userData;
+    const userResponse = { ...userWithoutPassword, _id: userData.id };
+
+    res.status(200).json({ success: true, user: userResponse, Token: token });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullname, profilePic, bio } = req.body;
+    const updateData = {
+      fullname,
+      bio,
+      updatedAt: new Date(),
+    };
+    if (profilePic) {
+      updateData.profilePic = profilePic;
+    }
+
+    const [updatedUser] = await db
+      .update(chatUsers)
+      .set(updateData)
+      .where(eq(chatUsers.id, req.user._id))
+      .returning({
+        id: chatUsers.id,
+        email: chatUsers.email,
+        fullname: chatUsers.fullname,
+        profilePic: chatUsers.profilePic,
+        bio: chatUsers.bio,
+        createdAt: chatUsers.createdAt,
+        updatedAt: chatUsers.updatedAt,
+      });
+
+    const userResponse = { ...updatedUser, _id: updatedUser.id };
+    res.status(200).json({ success: true, user: userResponse });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getUser = async (req, res) => {
+  try {
+    const [user] = await db
+      .select({
+        id: chatUsers.id,
+        email: chatUsers.email,
+        fullname: chatUsers.fullname,
+        profilePic: chatUsers.profilePic,
+        bio: chatUsers.bio,
+        createdAt: chatUsers.createdAt,
+        updatedAt: chatUsers.updatedAt,
+      })
+      .from(chatUsers)
+      .where(eq(chatUsers.id, req.user._id));
+
+    const userResponse = { ...user, _id: user.id };
+    res.status(200).json({ success: true, user: userResponse });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
