@@ -3,6 +3,7 @@ import { db } from "../config/db.js";
 import { messages } from "../models/message.js";
 import { chatUsers } from "../models/user.js";
 import { io, userSocketMap } from "../config/socket.js";
+import { uploadChatImage, getReadableImageUrl } from "../config/s3.js";
 
 const publicUserColumns = {
   id: chatUsers.id,
@@ -108,10 +109,13 @@ export const getMessages = async (req, res) => {
         )
       );
 
-    const messagesResponse = chatMessages.map((msg) => ({
-      ...msg,
-      _id: msg.id,
-    }));
+    const messagesResponse = await Promise.all(
+      chatMessages.map(async (msg) => ({
+        ...msg,
+        _id: msg.id,
+        image: msg.image ? await getReadableImageUrl(msg.image) : msg.image,
+      }))
+    );
 
     res.status(200).json({ success: true, messages: messagesResponse });
   } catch (error) {
@@ -150,12 +154,23 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Message text or image is required" });
     }
 
+    // Client sends base64; upload to S3 and store the URL in Postgres
+    const imageUrl = image ? await uploadChatImage(image) : null;
+
     const [message] = await db
       .insert(messages)
-      .values({ text, image, sender, receiver })
+      .values({ text, image: imageUrl, sender, receiver })
       .returning();
 
-    const messageResponse = { ...message, _id: message.id };
+    const readableImage = message.image
+      ? await getReadableImageUrl(message.image)
+      : null;
+
+    const messageResponse = {
+      ...message,
+      _id: message.id,
+      image: readableImage,
+    };
 
     // SOCKET EMITS TO RECEIVER
     const receiverSocket = userSocketMap[String(receiver)];

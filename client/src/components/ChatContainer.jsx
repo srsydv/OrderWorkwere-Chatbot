@@ -63,6 +63,7 @@ const ChatContainer = () => {
         await sendMessage({ image: reader.result });
       } catch (err) {
         console.error(err.message);
+        alert(err.message || "Failed to send image");
       } finally {
         setSending(false);
         e.target.value = "";
